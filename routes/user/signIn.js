@@ -8,10 +8,6 @@ const awsRDS = require('../../privateModules/aws/rds');
 const validity = require('../../privateModules/validity');
 const jwt = require('../../privateModules/jwt');
 
-router.get('/', (req, res) => {
-
-});
-
 router.post('/', (req, res) => {
 	let memberName = req.body.memberName;
 	let memberPassword = req.body.memberPassword;
@@ -46,8 +42,6 @@ router.post('/', (req, res) => {
 			let checkMemberDQL = 'select no, name, password, salt from member where name=:name';
 
 			rdsConnection.execute(checkMemberDQL, [memberName], {autoCommit : true}, (checkMemberDQLError, checkMemberDQLResult) => {
-				rdsConnection.release();
-
 				if(checkMemberDQLError) {
 					callback('Check member fail : ' + checkMemberDQLError);
 				} else if(checkMemberDQLResult.rows[0] === undefined) {
@@ -65,8 +59,17 @@ router.post('/', (req, res) => {
 						salt : checkMemberDQLResult.rows[0][3]
 					};
 
-					callback(null, savedMemberData);
+					callback(null, savedMemberData, rdsConnection);
 				}
+			});
+		},
+		(savedMemberData, rdsConnection, callback) => {
+			let updateMemberStatusDML = 'update member set status=:status where name=:name';
+
+			rdsConnection.execute(updateMemberStatusDML, [1, memberName], {autoCommit : true}, (updateMemberStatusDMLError) => {
+				rdsConnection.release();
+				if(updateMemberStatusDMLError) callback('Update member status fail : ' + updateMemberStatusDMLError);
+				else callback(null, savedMemberData);
 			});
 		},
 		(savedMemberData, callback) => {
@@ -108,8 +111,8 @@ router.post('/', (req, res) => {
 	];
 
 	async.waterfall(signInAsyncFlow, (asyncError, asyncResult) => {
-		if(asyncError) console.log('Sign-in flow error\n' + asyncError);
-		else console.log('Sign-in flow success\n' + asyncResult);
+		if(asyncError) console.log('Sign-in error\n' + asyncError);
+		else console.log('Sign-in success\n' + asyncResult);
 	});
 });
 

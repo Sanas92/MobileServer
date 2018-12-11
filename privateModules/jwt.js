@@ -7,7 +7,7 @@ module.exports.createJWT = function(memberNo, callbackFunction) {
 	};
 	let option = {
 		algorithm : 'HS512',
-		expiresIn : 3600 * 24
+		expiresIn : 3600
 	};
 
 	jsonwebtoken.sign(payload, jwtConfig.secret, option, (createJWTError, createJWTResult) => {
@@ -18,9 +18,12 @@ module.exports.createJWT = function(memberNo, callbackFunction) {
 
 module.exports.checkJWT = function(memberJWT, callbackFunction) {
 	jsonwebtoken.verify(memberJWT, jwtConfig.secret, (checkJWTError, checkJWTResult) => {
-		if(checkJWTError.message === 'JWT expired') callbackFunction(checkJWTError.message);
-		else if(checkJWTError.message === 'invalid token') callbackFunction(checkJWTError.message);
-		else if(checkJWTError !== '' || checkJWTError !== undefined || checkJWTError !== null) callbackFunction('unexpected error');
-		else callbackFunction(null, checkJWTResult);
+		if(checkJWTError) {
+			if(checkJWTError.message === 'jwt expired') callbackFunction('Check JWT fail : ' + checkJWTError.message);
+			else if(checkJWTError.message === 'invalid token') callbackFunction('Check JWT fail : ' + checkJWTError.message);
+			else callbackFunction('Check JWT fail : unexpected error');
+		} else {
+			callbackFunction(null, checkJWTResult);
+		}
 	});
 };

@@ -7,10 +7,6 @@ const oracledb = require('oracledb');
 const awsRDS = require('../../privateModules/aws/rds');
 const validity = require('../../privateModules/validity');
 
-router.get('/', (req, res) => {
-
-});
-
 router.post('/', (req, res) => {
 	let memberName = req.body.memberName;
 	let memberEmail = req.body.memberEmail;
@@ -104,8 +100,8 @@ router.post('/', (req, res) => {
 	];
 
 	async.waterfall(signUpAsyncFlow, (asyncError, asyncResult) => {
-		if(asyncError) console.log('Sign-up flow error\n' + asyncError);
-		else console.log('Sign-up flow success\n' + asyncResult);
+		if(asyncError) console.log('Sign-up error\n' + asyncError);
+		else console.log('Sign-up success\n' + asyncResult);
 	});
 });
 
