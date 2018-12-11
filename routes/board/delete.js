@@ -37,7 +37,7 @@ router.post('/:boardNo', (req, res) => {
 					callback(null, rdsConnectingResult, memberNo);
 				}
 			});
-		},
+		}, 
 		(rdsConnection, memberNo, callback) => {
 			let deleteBoardDML = 'delete from board where no=:boardno and memberno=:memberno';
 

@@ -97,24 +97,7 @@ router.get('/:page', (req, res) => {
 					data : boardPageList
 				});
 			} else {
-				boardPageData.map((boardData) => {
-					boardLikeList.map((boardLike) => {
-						if(boardData[0] === boardLikeList[0]){
-							return boardData.push('Y');
-						} else {
-							return boardData.push('N');
-						}
-					});
-
-					boardPageList.push({
-						boardNo : boardData[0],
-						boardTitle : boardData[1],
-						boardHits : boarData[2],
-						boardLikes : boardData[3],
-						boardWriter : boardData[4],
-						memberLike : boardData[5]
-					});
-				});
+			/* 이 부분 수정예정 */
 			}
 		}
 	];
