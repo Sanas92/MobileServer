@@ -1,4 +1,4 @@
-module.exports.check = function(memberInfo) {
-	if(memberInfo === null || memberInfo === '' || memberInfo === undefined) return false;
+module.exports.check = function(data) {
+	if(data === null || data === '' || data === undefined) return false;
 	return true;
 }
