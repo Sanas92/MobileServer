@@ -51,7 +51,7 @@ router.post('/:boardNo', (req, res) => {
 		},
 		(rdsConnection, memberNo, isLike, callback) => {
 			if(isLike) {
-				let cancleLikeDML = 'delete from like where memberno=:memberno and boardno=:boardno';
+				let cancleLikeDML = 'delete from dolike where memberno=:memberno and boardno=:boardno';
 
 				rdsConnection.execute(cancleLikeDML, [memberNo, boardNo], {autoCommit : true}, (cancleLikeDMLError, cancleLikeDMLResult) => {
 					if(cancleLikeDMLError) {

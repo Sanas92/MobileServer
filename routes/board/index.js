@@ -98,6 +98,30 @@ router.get('/:page', (req, res) => {
 				});
 			} else {
 			/* 이 부분 수정예정 */
+				boardPageData.map((boardData, boardDataIndex) => {
+					boardPageList[boardDataIndex] = {
+						boardNo : boardData[0],
+						boardTitle : boardData[1],
+						boardHits : boardData[2],
+						boardLikes : boardData[3],
+						boardWriter : boardData[4]
+					}
+
+					boardLikeList.map((likeList, likeListIndex) => {
+						if(boardData[0] === likeList[0])
+							return boardPageList[boardDataIndex].memberLike = 'Y';
+						if(likeListIndex === boardLikeList.length - 1 && boardPageList[boardDataIndex].memberLike !== 'Y')
+							return boardPageList[boardDataIndex].memberLike = 'N';
+					});
+				});
+
+				callback(null, 'Read board page success');
+
+				res.status(200).send({
+					stat : 'Success',
+					msg : 'Read board page success',
+					data : boardPageList
+				});
 			}
 		}
 	];
