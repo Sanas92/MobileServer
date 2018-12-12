@@ -60,6 +60,8 @@ router.post('/:replyNo', (req, res) => {
 			let deleteReplyDML = 'delete from reply where no=:replyno';
 
 			rdsConnection.execute(deleteReplyDML, [replyNo], {autoCommit : true}, (deleteReplyDMLError, deleteReplyDMLResult) => {
+				rdsConnection.release();
+
 				if(deleteReplyDMLError) {
 					callback('Delete reply fail : ' + deleteReplyDMLError);
 				} else {

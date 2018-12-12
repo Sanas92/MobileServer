@@ -66,10 +66,21 @@ router.post('/', (req, res) => {
 		(savedMemberData, rdsConnection, callback) => {
 			let updateMemberStatusDML = 'update member set status=:status where name=:name';
 
-			rdsConnection.execute(updateMemberStatusDML, [1, memberName], {autoCommit : true}, (updateMemberStatusDMLError) => {
+			rdsConnection.execute(updateMemberStatusDML, [1, memberName], {autoCommit : true}, (updateMemberStatusDMLError, updateMemberStatusDMLResult) => {
 				rdsConnection.release();
-				if(updateMemberStatusDMLError) callback('Update member status fail : ' + updateMemberStatusDMLError);
-				else callback(null, savedMemberData);
+
+				if(updateMemberStatusDMLError) {
+					callback('Update member status fail : ' + updateMemberStatusDMLError);
+				} else if(updateMemberStatusDMLResult.rowsAffected !== 1) {
+					callback('Update member status fail : unexpected error');
+
+					res.status(500).send({
+						stat : 'Fail',
+						msg : 'Update member status fail : unexpected error'
+					});
+				} else {
+					callback(null, savedMemberData);
+				}
 			});
 		},
 		(savedMemberData, callback) => {

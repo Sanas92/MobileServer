@@ -61,6 +61,8 @@ router.post('/:replyNo', (req, res) => {
 			let updateReplyDML = 'update reply set content=:content where no=:replyno';
 
 			rdsConnection.execute(updateReplyDML, [replyContent, replyNo], {autoCommit : true}, (updateReplyDMLError, updateReplyDMLResult) => {
+				rdsConnection.release();
+
 				if(updateReplyDMLError) {
 					callback('Update reply fail : ' + updateReplyDMLError);
 				} else if(updateReplyDMLResult.rowsAffected !== 1) {

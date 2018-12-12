@@ -33,6 +33,8 @@ router.post('/', (req, res) => {
 			let updateMemberStatusDML = 'update member set status=:status where no=:no';
 
 			rdsConnection.execute(updateMemberStatusDML, [0, memberNo], {autoCommit : true}, (updateMemberStatusDMLError, updateMemberStatusDMLresult) => {
+				rdsConnection.release();
+
 				if(updateMemberStatusDMLError) {
 					callback('Update member status fail : ' + updateMemberStatusDMLError);
 				} else {

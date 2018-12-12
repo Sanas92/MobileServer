@@ -80,15 +80,15 @@ router.post('/', (req, res) => {
 			})
 		},
 		(rdsConnection, salt, hashedPassword, callback) => {
-			let createMemberDML = 'insert into member values (member_seq.nextval, :name, :password, :age, :email, :gender, :authorization, :salt)';
+			let createMemberDML = 'insert into member values (member_seq.nextval, :name, :password, :age, :email, :gender, 0, :salt, 0)';
 			
-			rdsConnection.execute(createMemberDML, [memberName, hashedPassword, memberAge, memberEmail, memberGender, null, salt], {autoCommit : true}, (createMemberDMLError) => {
+			rdsConnection.execute(createMemberDML, [memberName, hashedPassword, memberAge, memberEmail, memberGender, salt], {autoCommit : true}, (createMemberDMLError) => {
 				rdsConnection.release();
 
 				if(createMemberDMLError) {
 					callback('Create member fail : ' + createMemberDMLError);
 				} else {
-					callback('Sign-up async flow success');
+					callback(null, 'Sign-up async flow success');
 					
 					res.status(201).send({
 						stat : 'Success',
