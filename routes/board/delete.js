@@ -39,37 +39,62 @@ router.post('/:boardNo', (req, res) => {
 			});
 		}, 
 		(rdsConnection, memberNo, callback) => {
-			let deleteBoardDML = 'delete from board where no=:boardno and memberno=:memberno';
+			let deleteLikeDML = 'delete from dolike where boardno=:boardno';
 
-			rdsConnection.execute(deleteBoardDML, [boardNo, memberNo], {autoCommit : true}, (deleteBoardDMLError, deleteBoardDMLResult) => {
-				if(deleteBoardDMLError) {
-					callback('Delete board fail : ' + deleteBoardDMLError);
-				} else if(deleteBoardDMLResult.rowsAffected === 1) {
-					callback(null, rdsConnection);
-				} else {
-					callback('Delete board fail : not verified user');
-
-					res.status(500).send({
-						stat : 'Fail',
-						msg : 'Delete board fail : not verified user'
+			rdsConnection.execute(deleteLikeDML, [boardNo], (deleteLikeDMLError, deleteLikeDMLResult) => {
+				if(deleteLikeDMLError) {
+					rdsConnection.rollback((dmlRollbackError) => {
+						rdsConnection.release();
+						if(dmlRollbackError) {
+							callback('DML rollback fail : ' + dmlRollbackError);
+						} else {
+							callback('Delete like fail : ' + deleteLikeDMLError);
+						}
 					});
+				} else {
+					callback(null, rdsConnection, memberNo);
 				}
 			});
 		},
-		(rdsConnection, callback) => {
-			let deleteLikeDML = 'delete from dolike where boardno=:boardno';
+		(rdsConnection, memberNo, callback) => {
+			let deleteBoardDML = 'delete from board where no=:boardno and memberno=:memberno';
 
-			rdsConnection.execute(deleteLikeDML, [boardNo], {autoCommit : true}, (deleteLikeDMLError, deleteLikeDMLResult) => {
-				rdsConnection.release();
+			rdsConnection.execute(deleteBoardDML, [boardNo, memberNo], (deleteBoardDMLError, deleteBoardDMLResult) => {
+				if(deleteBoardDMLError) {
+					rdsConnection.rollback((dmlRollbackError) => {
+						rdsConnection.release();
+						if(dmlRollbackError) {
+							callback('DML rollback fail : ' + dmlRollbackError);
+						} else {
+							callback('Delete board fail : ' + deleteBoardDMLError);
+						}
+					});
+				} else if(deleteBoardDMLResult.rowsAffected === 1) {
+					rdsConnection.commit((dmlCommitError) => {
+						rdsConnection.release();
+						if(dmlCommitError) {
+							callback('DML commit fail : ' + dmlCommitError);
+						} else {
+							callback(null, 'Delete board success');
 
-				if(deleteLikeDMLError) {
-					callback('Delete like fail : ' + deleteLikeDMLError);
+							res.status(201).send({
+								stat : 'Success',
+								msg : 'Delete board success'
+							});
+						}
+					});
 				} else {
-					callback(null, 'Delete board success');
+					rdsConnection.rollback((dmlRollbackError) => {
+						if(dmlRollbackError) {
+							callback('DML rollback error : ' + dmlRollbackError);
+						} else {
+							callback('Delete board fail : not verified user');
 
-					res.status(201).send({
-						stat : 'Success',
-						msg : 'Delete board success'
+							res.status(500).send({
+								stat : 'Fail',
+								msg : 'Delete board fail : not verified user'
+							});
+						}
 					});
 				}
 			});

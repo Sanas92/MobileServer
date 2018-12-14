@@ -42,15 +42,29 @@ router.post('/:replyNo', (req, res) => {
 		(rdsConnection, memberNo, callback) => {
 			let checkReplyMemberDQL = 'select memberno from reply where no=:replyno';
 
-			rdsConnection.execute(checkReplyMemberDQL, [replyNo], {autoCommit : true}, (checkReplyMemberDQLError, checkReplyMemberDQLResult) => {
+			rdsConnection.execute(checkReplyMemberDQL, [replyNo], (checkReplyMemberDQLError, checkReplyMemberDQLResult) => {
 				if(checkReplyMemberDQLError) {
-					callback('Check reply fail : ' + checkReplyMemberDQLError);
+					rdsConnection.rollback((dqlRollbackError) => {
+						rdsConnection.release();
+						if(dqlRollbackError) {
+							callback('DQL rollback fail : ' + dqlRollbackError);
+						} else {
+							callback('Check reply fail : ' + checkReplyMemberDQLError);
+						}
+					});
 				} else if(checkReplyMemberDQLResult.rows[0][0] !== memberNo){
-					callback('Not verfied user');
+					rdsConnection.rollback((dqlRollbackError) => {
+						rdsConnection.release();
+						if(dqlRollbackError) {
+							callback('DQL rollback fail : ' + dqlRollbackError);
+						} else {
+							callback('Not verfied user');
 
-					res.status(400).send({
-						stat : 'Fail',
-						msg : 'Not verified user'
+							res.status(400).send({
+								stat : 'Fail',
+								msg : 'Not verified user'
+							});
+						}
 					});
 				} else {
 					callback(null, rdsConnection);
@@ -60,24 +74,43 @@ router.post('/:replyNo', (req, res) => {
 		(rdsConnection, callback) => {
 			let updateReplyDML = 'update reply set content=:content where no=:replyno';
 
-			rdsConnection.execute(updateReplyDML, [replyContent, replyNo], {autoCommit : true}, (updateReplyDMLError, updateReplyDMLResult) => {
-				rdsConnection.release();
-
+			rdsConnection.execute(updateReplyDML, [replyContent, replyNo], (updateReplyDMLError, updateReplyDMLResult) => {
 				if(updateReplyDMLError) {
-					callback('Update reply fail : ' + updateReplyDMLError);
+					rdsConnection.rollback((dmlRollbackError) => {
+						rdsConnection.release();
+						if(dmlRollbackError) {
+							callback('DML rollback fail : ' + dmlRollbackError);
+						} else {
+							callback('Update reply fail : ' + updateReplyDMLError);
+						}
+					});
 				} else if(updateReplyDMLResult.rowsAffected !== 1) {
-					callback('Update reply fail : unexpected error');
+					rdsConnection.rollback((dmlRollbackError) => {
+						rdsConnection.release();
+						if(dmlRollbackError) {
+							callback('DML rollback fail : ' + dmlRollbackError);
+						} else {
+							callback('Update reply fail : unexpected error');
 
-					res.status(500).send({
-						stat : 'Fail',
-						msg : 'Update reply fail : unexpected error'
+							res.status(500).send({
+								stat : 'Fail',
+								msg : 'Update reply fail : unexpected error'
+							});
+						}
 					});
 				} else {
-					callback(null, 'Update reply success');
+					rdsConnection.commit((dmlCommitError) => {
+						rdsConnection.release();
+						if(dmlCommitError) {
+							callback('DML commit fail : ' + dmlCommitError);
+						} else {
+							callback(null, 'Update reply success');
 
-					res.status(201).send({
-						stat : 'Success',
-						msg : 'Update reply success'
+							res.status(201).send({
+								stat : 'Success',
+								msg : 'Update reply success'
+							});
+						}
 					});
 				}
 			});

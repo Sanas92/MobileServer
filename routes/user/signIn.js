@@ -41,15 +41,29 @@ router.post('/', (req, res) => {
 		(rdsConnection, callback) => {
 			let checkMemberDQL = 'select no, name, password, salt from member where name=:name';
 
-			rdsConnection.execute(checkMemberDQL, [memberName], {autoCommit : true}, (checkMemberDQLError, checkMemberDQLResult) => {
+			rdsConnection.execute(checkMemberDQL, [memberName], (checkMemberDQLError, checkMemberDQLResult) => {
 				if(checkMemberDQLError) {
-					callback('Check member fail : ' + checkMemberDQLError);
+					rdsConnection.rollback((dqlRollbackError) => {
+						rdsConnection.release();
+						if(dqlRollbackError) {
+							callback('DQL rollback fail : ' + dqlRollbackError);
+						} else {
+							callback('Check member fail : ' + checkMemberDQLError);
+						}
+					});
 				} else if(checkMemberDQLResult.rows[0] === undefined) {
-					callback('Check member fail : no user');
+					rdsConnection.rollback((dqlRollbackError) => {
+						rdsConnection.release();
+						if(dqlRollbackError) {
+							callback('DQL rollback fail : ' + dqlRollbackError);
+						} else {
+							callback('Check member fail : no user');
 
-					res.status(400).send({
-						stat : 'Fail',
-						msg : 'Check member fail : no user'
+							res.status(400).send({
+								stat : 'Fail',
+								msg : 'Check member fail : no user'
+							});
+						}
 					});
 				} else {
 					let savedMemberData = {
@@ -66,20 +80,39 @@ router.post('/', (req, res) => {
 		(savedMemberData, rdsConnection, callback) => {
 			let updateMemberStatusDML = 'update member set status=:status where name=:name';
 
-			rdsConnection.execute(updateMemberStatusDML, [1, memberName], {autoCommit : true}, (updateMemberStatusDMLError, updateMemberStatusDMLResult) => {
-				rdsConnection.release();
-
+			rdsConnection.execute(updateMemberStatusDML, [1, memberName], (updateMemberStatusDMLError, updateMemberStatusDMLResult) => {
 				if(updateMemberStatusDMLError) {
-					callback('Update member status fail : ' + updateMemberStatusDMLError);
+					rdsConnection.rollback((dmlRollbackError) => {
+						rdsConnection.release();
+						if(dmlRollbackError) {
+							callback('DML rollback fail : ' + dmlRollbackError);
+						} else {
+							callback('Update member status fail : ' + updateMemberStatusDMLError);
+						}
+					});
 				} else if(updateMemberStatusDMLResult.rowsAffected !== 1) {
-					callback('Update member status fail : unexpected error');
+					rdsConnection.rollback((dmlRollbackError) => {
+						rdsConnection.release();
+						if(dmlRollbackError) {
+							callback('DML rollback fail : ' + dmlRollbackError);
+						} else {
+							callback('Update member status fail : unexpected error');
 
-					res.status(500).send({
-						stat : 'Fail',
-						msg : 'Update member status fail : unexpected error'
+							res.status(500).send({
+								stat : 'Fail',
+								msg : 'Update member status fail : unexpected error'
+							});
+						}
 					});
 				} else {
-					callback(null, savedMemberData);
+					rdsConnection.commit((dmlCommitError) => {
+						rdsConnection.release();
+						if(dmlCommitError) {
+							callback('DML commit fail : ' + dmlCommitError);
+						} else {
+							callback(null, savedMemberData);
+						}
+					});
 				}
 			});
 		},

@@ -41,16 +41,30 @@ router.post('/:replyNo', (req, res) => {
 		(rdsConnection, memberNo, callback) => {
 			let checkMemberDQL = 'select memberno from reply where no=:replyno';
 
-			rdsConnection.execute(checkMemberDQL, [replyNo], {autoCommit : true}, (checkMemberDQLError, checkMemberDQLResult) => {
+			rdsConnection.execute(checkMemberDQL, [replyNo], (checkMemberDQLError, checkMemberDQLResult) => {
 				if(checkMemberDQLError) {
-					callback('Check member fail : ' + checkMemberDQLError);
-				} else if(checkMemberDQLResult.rows[0][0] !== memberNo) {
-					callback('Delete reply fail : not verified user');
-
-					res.status(400).send({
-						stat : 'Fail',
-						msg : 'Delete reply fail : not verified user'
+					rdsConnection.rollback((dqlRollbackError) => {
+						rdsConnection.release();
+						if(dqlRollbackError) {
+							callback('DQL rollback fail : ' + dqlRollbackError);
+						} else {
+							callback('Check member fail : ' + checkMemberDQLError);
+						}
 					});
+				} else if(checkMemberDQLResult.rows[0][0] !== memberNo) {
+					rdsConnection.rollback((dqlRollbackError) => {
+						rdsConnection.release();
+						if(dqlRollbackError) {
+							callback('DQL rollback fail : ' + dqlRollbackError);
+						} else {
+							callback('Delete reply fail : not verified user');
+
+							res.status(400).send({
+								stat : 'Fail',
+								msg : 'Delete reply fail : not verified user'
+							});
+						}
+					});	
 				} else {
 					callback(null, rdsConnection);
 				}	
@@ -59,17 +73,28 @@ router.post('/:replyNo', (req, res) => {
 		(rdsConnection, callback) => {
 			let deleteReplyDML = 'delete from reply where no=:replyno';
 
-			rdsConnection.execute(deleteReplyDML, [replyNo], {autoCommit : true}, (deleteReplyDMLError, deleteReplyDMLResult) => {
-				rdsConnection.release();
-
+			rdsConnection.execute(deleteReplyDML, [replyNo], (deleteReplyDMLError, deleteReplyDMLResult) => {
 				if(deleteReplyDMLError) {
-					callback('Delete reply fail : ' + deleteReplyDMLError);
+					rdsConnection.rollback((dmlRollbackError) => {
+						if(dmlRollbackError) {
+							callback('DML rollback fail : ' + dmlRollbackError);
+						} else {
+							callback('Delete reply fail : ' + deleteReplyDMLError);
+						}
+					});
 				} else {
-					callback(null, 'Delete reply success');
+					rdsConnection.commit((dmlCommitError) => {
+						rdsConnection.release();
+						if(dmlCommitError) {
+							callback('DML commit fail : ' + dmlCommitError);
+						} else {
+							callback(null, 'Delete reply success');
 
-					res.status(201).send({
-						stat : 'Success',
-						msg : 'Delete reply success'
+							res.status(201).send({
+								stat : 'Success',
+								msg : 'Delete reply success'
+							});
+						}
 					});
 				}
 			});

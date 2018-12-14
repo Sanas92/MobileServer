@@ -43,7 +43,14 @@ router.post('/:boardNo', (req, res) => {
 
 			rdsConnection.execute(checkLikeDQL, [boardNo, memberNo], (checkLikeDQLError, checkLikeDQLResult) => {
 				if(checkLikeDQLError) {
-					callback('Check like fail : ' + checkLikeDQLError);
+					rdsConnection.rollback((dqlRollbackError) => {
+						rdsConnection.release();
+						if(dqlRollbackError) {
+							callback('DQL rollback fail : ' + dqlRollbackError);
+						} else {
+							callback('Check like fail : ' + checkLikeDQLError);
+						}
+					});	
 				} else {
 					callback(null, rdsConnection, memberNo, checkLikeDQLResult.rows[0][0]);
 				}
@@ -53,9 +60,16 @@ router.post('/:boardNo', (req, res) => {
 			if(isLike) {
 				let cancleLikeDML = 'delete from dolike where memberno=:memberno and boardno=:boardno';
 
-				rdsConnection.execute(cancleLikeDML, [memberNo, boardNo], {autoCommit : true}, (cancleLikeDMLError, cancleLikeDMLResult) => {
+				rdsConnection.execute(cancleLikeDML, [memberNo, boardNo], (cancleLikeDMLError, cancleLikeDMLResult) => {
 					if(cancleLikeDMLError) {
-						callback('Cancle like fail : ' + cancleLikeDMLError);
+						rdsConnection.rollback((dmlRollbackError) => {
+							rdsConnection.release();
+							if(dmlRollbackError) {
+								callback('DML rollback fail : ' + dmlRollbackError);
+							} else {
+								callback('Cancle like fail : ' + cancleLikeDMLError);
+							}
+						});
 					} else {
 						callback(null, rdsConnection, memberNo, isLike);
 					}
@@ -63,9 +77,15 @@ router.post('/:boardNo', (req, res) => {
 			} else {
 				let doLikeDML = 'insert into dolike values (dolike_seq.nextval, :memberno, :boardno)';
 				
-				rdsConnection.execute(doLikeDML, [memberNo, boardNo], {autoCommit : true}, (doLikeDMLError, doLikeDMLResult) => {
+				rdsConnection.execute(doLikeDML, [memberNo, boardNo], (doLikeDMLError, doLikeDMLResult) => {
 					if(doLikeDMLError) {
-						callback('Do like fail : ' + doLikeDMLError);
+						rdsConnection.rollback((dmlRollbackError) => {
+							if(dmlRollbackError) {
+								callback('DML rollback fail : ' + dmlRollbackError);
+							} else {
+								callback('Do like fail : ' + doLikeDMLError);
+							}
+						});
 					} else {
 						callback(null, rdsConnection, memberNo, isLike);
 					}
@@ -76,32 +96,58 @@ router.post('/:boardNo', (req, res) => {
 			if(isLike) {
 				let subBoardLikesDML = 'update board set likes=likes-1 where no=:boardno';
 
-				rdsConnection.execute(subBoardLikesDML, [boardNo], {autoCommit : true}, (subBoardLikesDMLError, subBoardLikesDMLResult) => {
-					rdsConnection.release();
-
+				rdsConnection.execute(subBoardLikesDML, [boardNo], (subBoardLikesDMLError, subBoardLikesDMLResult) => {
 					if(subBoardLikesDMLError) {
-						callback('Sub board like fail : ' + subBoardLikesDMLError);
+						rdsConnection.rollback((dmlRollbackError) => {
+							rdsConnection.release();
+							if(dmlRollbackError) {
+								callback('DML rollback fail : ' + dmlRollbackError);
+							} else {
+								callback('Sub board like fail : ' + subBoardLikesDMLError);
+							}
+						});
 					} else {
-						callback(null, 'Undo like success');
+						rdsConnection.commit((dmlCommitError) => {
+							rdsConnection.release();
+							if(dmlCommitError) {
+								callback('DML rollback fail : ' + dmlCommitError);
+							} else {
+								callback(null, 'Undo like success');
 
-						res.status(201).send({
-							stat : 'Success',
-							msg : 'Undo like success'
+								res.status(201).send({
+									stat : 'Success',
+									msg : 'Undo like success'
+								});
+							}
 						});
 					}
 				});
 			} else {
 				let addBoardLikeDML = 'update board set likes=likes+1 where no=:boardno';
 
-				rdsConnection.execute(addBoardLikeDML, [boardNo], {autoCommit : true}, (addBoardLikeDMLError, addBoardLikeDMLResult) => {
+				rdsConnection.execute(addBoardLikeDML, [boardNo], (addBoardLikeDMLError, addBoardLikeDMLResult) => {
 					if(addBoardLikeDMLError) {
-						callback('Add board like fail : ' + addBoardLikeDMLError);
+						rdsConnection.rollback((dmlRollbackError) => {
+							rdsConnection.release();
+							if(dmlRollbackError) {
+								callback('DML rollback fail : ' + dmlRollbackError);
+							} else {
+								callback('Add board like fail : ' + addBoardLikeDMLError);
+							}
+						});
 					} else {
-						callback(null, 'Do like success');
+						rdsConnection.commit((dmlCommitError) => {
+							rdsConnection.release();
+							if(dmlCommitError) {
+								callback('DML commit fail : ' + dmlCommitError);
+							} else {
+								callback(null, 'Do like success');
 
-						res.status(201).send({
-							stat : 'Success',
-							msg : 'Do like success'
+								res.status(201).send({
+									stat : 'Success',
+									msg : 'Do like success'
+								});
+							}
 						});
 					}
 				});

@@ -53,9 +53,16 @@ router.get('/:page', (req, res) => {
 			let startRownum = 10 * (boardPage - 1) + 1;
 			let endRownum = startRownum + 10;
 
-			rdsConnection.execute(readBoardPageDQL, [startRownum, endRownum], {autoCommit : true}, (readBoardPageDQLError, readBoardPageDQLResult) => {
+			rdsConnection.execute(readBoardPageDQL, [startRownum, endRownum], (readBoardPageDQLError, readBoardPageDQLResult) => {
 				if(readBoardPageDQLError) {
-					callback('Read board page fail : ' + readBoardPageDQLError);
+					rdsConnection.rollback((dqlRollbackError) => {
+						rdsConnection.release();
+						if(dqlRollbackError) {
+							callback('DQL rollback fail : ' + dqlRollbackError);
+						} else {
+							callback('Read board page fail : ' + readBoardPageDQLError);
+						}
+					})
 				} else {
 					callback(null, rdsConnection, memberNo, readBoardPageDQLResult.rows);
 				}
@@ -64,13 +71,25 @@ router.get('/:page', (req, res) => {
 		(rdsConnection, memberNo, boardPageData, callback) => {
 			let checkBoardLikeDQL = 'select boardno from dolike where memberno=:memberno';
 
-			rdsConnection.execute(checkBoardLikeDQL, [memberNo], {autoCommit : true}, (checkBoardLikeDQLError, checkBoardLikeDQLResult) => {
-				rdsConnection.release();
-
+			rdsConnection.execute(checkBoardLikeDQL, [memberNo], (checkBoardLikeDQLError, checkBoardLikeDQLResult) => {
 				if(checkBoardLikeDQLError) {
-					callback('Check board like fail : ' + checkBoardLikeDQLError);
+					rdsConnection.rollback((dqlRollbackError) => {
+						rdsConnection.release();
+						if(dqlRollbackError) {
+							callback('DQL rollback fail : ' + dqlRollbackError);
+						} else {
+							callback('Check board like fail : ' + checkBoardLikeDQLError);
+						}
+					})
 				} else {
-					callback(null, memberNo, boardPageData, checkBoardLikeDQLResult.rows);
+					rdsConnection.commit((dqlCommitError) => {
+						rdsConnection.release();
+						if(dqlCommitError) {
+							callback('DQL commit fail : ' + dqlCommitError);
+						} else {
+							callback(null, memberNo, boardPageData, checkBoardLikeDQLResult.rows);
+						}
+					});
 				}
 			});
 		},

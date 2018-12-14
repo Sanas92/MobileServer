@@ -25,9 +25,16 @@ router.get('/:boardNo', (req, res) => {
 		(rdsConnection, callback) => {
 			let addBoardHitsDML = 'update board set hits=hits+1 where no=:no';
 
-			rdsConnection.execute(addBoardHitsDML, [boardNo], {autoCommit : true}, (addBoardHitsDMLError, addBoardHitsDMLResult) => {
+			rdsConnection.execute(addBoardHitsDML, [boardNo], (addBoardHitsDMLError, addBoardHitsDMLResult) => {
 				if(addBoardHitsDMLError) {
-					callback('Add board hits fail : ' + addBoardHitsDMLError);
+					rdsConnection.rollback((dmlRollbackError) => {
+						rdsConnection.release();
+						if(dmlRollbackError) {
+							callback('DML rollback fail : ' + dmlRollbackError);
+						} else {
+							callback('Add board hits fail : ' + addBoardHitsDMLError);
+						}
+					});
 				} else {
 					callback(null, rdsConnection);
 				}
@@ -36,25 +43,43 @@ router.get('/:boardNo', (req, res) => {
 		(rdsConnection, callback) => {
 			let readBoardDQL = 'select * from board where no=:no';
 
-			rdsConnection.execute(readBoardDQL, [boardNo], {autoCommit : true}, (readBoardDQLError, readBoardDQLResult) => {
-				rdsConnection.release();
-
+			rdsConnection.execute(readBoardDQL, [boardNo], (readBoardDQLError, readBoardDQLResult) => {
 				if(readBoardDQLError) {
-					callback('Read board fail : ' + readBoardDQLError);
+					rdsConnection.rollback((dqlRollbackError) => {
+						rdsConnection.release();
+						if(dqlRollbackError) {
+							callback('DQL rollback fail : ' + dqlRollbackError);
+						} else {
+							callback('Read board fail : ' + readBoardDQLError);
+						}
+					});
 				} else {
-					callback(null, 'Read board success');
+					rdsConnection.commit((dqlCommitError) => {
+						if(dqlCommitError) {
+							callback('DQL commit fail : ' + dqlCommitError);
+						} else if(readBoardDQLResult.rows[0] === undefined) {
+							callback(null, 'Read board fail : no data');
 
-					res.status(200).send({
-						stat : 'Success',
-						msg : 'Read board success',
-						data : {
-							boardNo : readBoardDQLResult.rows[0][0],
-							boardTitle : readBoardDQLResult.rows[0][1],
-							boardContent : readBoardDQLResult.rows[0][2],
-							boardHits : readBoardDQLResult.rows[0][3],
-							boardLikes : readBoardDQLResult.rows[0][4],
-							boardMemberNo : readBoardDQLResult.rows[0][5],
-							boardPicture : readBoardDQLResult.rows[0][6]
+							res.status(500).send({
+								stat : 'Fail',
+								msg : 'no data'
+							});
+						} else {
+							callback(null, 'Read board success');
+
+							res.status(200).send({
+								stat : 'Success',
+								msg : 'Read board success',
+								data : {
+									boardNo : readBoardDQLResult.rows[0][0],
+									boardTitle : readBoardDQLResult.rows[0][1],
+									boardContent : readBoardDQLResult.rows[0][2],
+									boardHits : readBoardDQLResult.rows[0][3],
+									boardLikes : readBoardDQLResult.rows[0][4],
+									boardMemberNo : readBoardDQLResult.rows[0][5],
+									boardPicture : readBoardDQLResult.rows[0][6]
+								}
+							});
 						}
 					});
 				}

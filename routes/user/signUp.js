@@ -51,17 +51,30 @@ router.post('/', (req, res) => {
 		(rdsConnection, callback) => {
 			let checkMemberDuplicationDQL = 'select name, email from member where (name=:name or email=:email)';
 
-			rdsConnection.execute(checkMemberDuplicationDQL, [memberName, memberEmail], {autoCommit : true}, (checkMemberDuplicationDQLError, checkMemberDuplicationDQLResult) => {
-				
+			rdsConnection.execute(checkMemberDuplicationDQL, [memberName, memberEmail], (checkMemberDuplicationDQLError, checkMemberDuplicationDQLResult) => {
 				if(checkMemberDuplicationDQLError) {
-					callback('Check member duplication fail : ' + checkMemberDuplicationDQLError);
-				} else if(checkMemberDuplicationDQLResult.rows[0] !== undefined) {
-					callback('Check member duplication success : already exist user');
-
-					res.status(400).send({
-						stat : 'Fail',
-						msg : 'Check member duplication success : already exist user'
+					rdsConnection.rollback((dqlRollbackError) => {
+						rdsConnection.release();
+						if(error) {
+							callback('DQL rollback fail : ' + dqlRollbackError);
+						} else {
+							callback('DQL rollback success : ' + checkMemberDuplicationDQLError);
+						}
 					});
+				} else if(checkMemberDuplicationDQLResult.rows[0] !== undefined) {
+					rdsConnection.rollback((dqlRollbackError) => {
+						rdsConnection.release();
+						if(dqlRollbackError) {
+							callback('DQL rollback fail : ' + dqlRollbackError);
+						} else {
+							callback('Check member duplication fail : duplicated member');
+							
+							res.status(400).send({
+								stat : 'Fail',
+								msg : 'Check member duplication fail : duplicated member'
+							});
+						}
+					})
 				} else{
 				 callback(null, rdsConnection);
 				}
@@ -82,17 +95,29 @@ router.post('/', (req, res) => {
 		(rdsConnection, salt, hashedPassword, callback) => {
 			let createMemberDML = 'insert into member values (member_seq.nextval, :name, :password, :age, :email, :gender, 0, :salt, 0)';
 			
-			rdsConnection.execute(createMemberDML, [memberName, hashedPassword, memberAge, memberEmail, memberGender, salt], {autoCommit : true}, (createMemberDMLError) => {
-				rdsConnection.release();
-
+			rdsConnection.execute(createMemberDML, [memberName, hashedPassword, memberAge, memberEmail, memberGender, salt], (createMemberDMLError) => {
 				if(createMemberDMLError) {
-					callback('Create member fail : ' + createMemberDMLError);
+					rdsConnection.rollback((dmlRollbackError) => {
+						rdsConnection.release();
+						if(dmlRollbackError) {
+							callback('DML rollback fail : ' + dmlRollbackError);
+						} else {
+							callback('Create member fail : ' + createMemberDMLError);
+						}
+					});
 				} else {
-					callback(null, 'Sign-up async flow success');
+					rdsConnection.commit((dmlCommitError) => {
+						rdsConnection.release();
+						if(dmlCommitError) {
+							callback('DML commit fail : ' + dmlCommitError);
+						} else {
+							callback(null, 'Sign-up async flow success');
 					
-					res.status(201).send({
-						stat : 'Success',
-						msg : 'Sign-up success'
+							res.status(201).send({
+								stat : 'Success',
+								msg : 'Sign-up success'
+							});
+						}
 					});
 				}
 			});
